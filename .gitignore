@@ -9,4 +9,9 @@ doc/*.css
 doc/erlang.png
 doc/edoc-info
 .rebar
+.rebar3
 .eunit
+*.code-workspace
+rebar.lock
+_build
+rebar3.*
