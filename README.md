@@ -2,7 +2,7 @@
 
 # rbeacon -  LAN discovery and presence. #
 
-[![Build Status](https://travis-ci.com/javiergarea/rbeacon.svg?branch=master)](https://travis-ci.org/javiergarea/rbeacon)
+[![Build Status](https://travis-ci.com/javiergarea/rbeacon.svg?branch=master)](https://travis-ci.com/javiergarea/rbeacon)
 [![Coverage Status](https://coveralls.io/repos/github/javiergarea/rbeacon/badge.svg?branch=master)](https://coveralls.io/github/javiergarea/rbeacon?branch=master)
 
 Copyright (c) 2014 Benoît Chesneau.
