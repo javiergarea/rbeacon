@@ -27,10 +27,14 @@ initial_state() ->
 command(S) ->
     oneof([{call, rbeacon, new, [user_udp_port()]},
            {call, ?MODULE, publish, [S#test_state.rbeacon, binary()]},
-           {call, ?MODULE, subscribe, [S#test_state.rbeacon, binary()]},
+           {call, ?MODULE, subscribe, [S#test_state.rbeacon, oneof([binary(),ascii_string()])]},
            {call, ?MODULE, unsubscribe, [S#test_state.rbeacon]},
            {call, ?MODULE, close, [S#test_state.rbeacon]}
           ]).
+
+%ASCII string generator
+ascii_string() ->
+     ?SUCHTHAT(S, string(), S == [X || X <- S, X =< 255]).
 
 % UDP ports 49152 through 65535
 user_udp_port() ->
