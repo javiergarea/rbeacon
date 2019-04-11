@@ -7,7 +7,7 @@
 
 -record(test_state,{rbeacon=null,
                     message=null,
-                    filter=[]}).
+                    filter=null}).
 
 %% @doc Default property
 prop_prop_rbeacon_stateful() ->
@@ -27,7 +27,7 @@ initial_state() ->
 command(S) ->
     oneof([{call, rbeacon, new, [user_udp_port()]},
            {call, ?MODULE, publish, [S#test_state.rbeacon, binary()]},
-           {call, ?MODULE, subscribe, [S#test_state.rbeacon, oneof([binary(),ascii_string()])]},
+           {call, ?MODULE, subscribe, [S#test_state.rbeacon, oneof([binary(), ascii_string()])]},
            {call, ?MODULE, unsubscribe, [S#test_state.rbeacon]},
            {call, ?MODULE, close, [S#test_state.rbeacon]}
           ]).
@@ -45,10 +45,12 @@ next_state(S, V, {call, rbeacon, new, _Port}) ->
     S#test_state{rbeacon = V};
 next_state(S, _V, {call, ?MODULE, publish, [_Beacon, Binary]}) ->
     S#test_state{message = Binary};
+next_state(S, _V, {call, ?MODULE, subscribe, [_Beacon, Filter]}) when S#test_state.filter == null ->
+    S#test_state{filter = [Filter]};
 next_state(S, _V, {call, ?MODULE, subscribe, [_Beacon, Filter]}) ->
     S#test_state{filter = S#test_state.filter ++ [Filter]};
 next_state(S, _V, {call, ?MODULE, unsubscribe, _Beacon}) ->
-    S#test_state{filter = []};
+    S#test_state{filter = null};
 next_state(S, _V, {call, ?MODULE, close, _Beacon}) ->
     S#test_state{rbeacon = null}.
 
@@ -64,7 +66,7 @@ precondition(S, {call, ?MODULE, subscribe, [_Beacon, _Filter]}) ->
     S#test_state.rbeacon =/= null;
 precondition(S, {call, ?MODULE, unsubscribe, _Beacon}) ->
     S#test_state.rbeacon =/= null
-    andalso S#test_state.filter =/= [];
+    andalso S#test_state.filter =/= null;
 precondition(_S, _Call) ->
     false.
 
