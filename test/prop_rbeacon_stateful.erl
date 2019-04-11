@@ -3,7 +3,8 @@
 
 -export([command/1, initial_state/0, next_state/3,
          precondition/2, postcondition/3]).
--export([close/1, publish/2, subscribe/2, unsubscribe/1, mock_new/1]).
+-export([close/1, publish/2, subscribe/2, unsubscribe/1]).
+-export([mock_new/1, mock_publish/2]).
 
 -record(test_state,{rbeacon=null,
                     message=null,
@@ -22,18 +23,18 @@ prop_prop_rbeacon_stateful() ->
 
 %% @doc Returns the state in which each test case starts.
 initial_state() ->
-    array:new([{size,2}, {fixed,true}, {default, #test_state{}}]).
+    {#test_state{}, #test_state{}}.
 
 %% @doc Command generator, S is the current state
 command(S) ->
-    A = array:get(0,S),
-    M = array:get(1,S),
+    {A, M} = S,
     oneof([{call, rbeacon, new, [user_udp_port()]},
            {call, ?MODULE, publish, [A#test_state.rbeacon, binary()]},
            {call, ?MODULE, subscribe, [A#test_state.rbeacon, oneof([binary(), ascii_string()])]},
            {call, ?MODULE, unsubscribe, [A#test_state.rbeacon]},
            {call, ?MODULE, close, [A#test_state.rbeacon]},
-           {call, ?MODULE, mock_new, A#test_state.port}
+           {call, ?MODULE, mock_new, A#test_state.port},
+           {call, ?MODULE, mock_publish, [M#test_state.rbeacon, binary()]}
           ]).
 
 %ASCII string generator
@@ -45,49 +46,40 @@ user_udp_port() ->
     integer(49152, 65535).
 
 %% @doc Next state transformation, S is the current state. Returns next state.
-next_state(S, V, {call, rbeacon, new, Port}) ->
-    A = array:get(0,S),
-    array:set(0, A#test_state{rbeacon = V, port = Port}, S);
-next_state(S, _V, {call, ?MODULE, publish, [_Beacon, Binary]}) ->
-    A = array:get(0,S),
-    array:set(0, A#test_state{message = Binary}, S);
-next_state(S, _V, {call, ?MODULE, subscribe, [_Beacon, Filter]}) ->
-    A = array:get(0,S),
-    case A#test_state.filter of 
-        null -> array:set(0, A#test_state{filter = [Filter]}, S);
-        _ -> array:set(0, A#test_state{filter = A#test_state.filter ++ [Filter]}, S)
-    end;
-next_state(S, _V, {call, ?MODULE, unsubscribe, _Beacon}) ->
-    A = array:get(0,S),
-    array:set(0, A#test_state{filter = null}, S);
-next_state(S, _V, {call, ?MODULE, close, _Beacon}) ->
-    A = array:get(0,S),
-    array:set(0, A#test_state{rbeacon = null}, S);
-next_state(S, V, {call, ?MODULE, mock_new, Port}) ->
-    A = array:get(1,S),
-    array:set(0, A#test_state{rbeacon = V, port = Port}, S).
+next_state({A, M}, V, {call, rbeacon, new, Port}) ->
+    {A#test_state{rbeacon = V, port = Port}, M};
+next_state({A, M}, _V, {call, ?MODULE, publish, [_Beacon, Binary]}) ->
+    {A#test_state{message = Binary}, M};
+next_state({A, M}, _V, {call, ?MODULE, subscribe, [_Beacon, Filter]}) when A#test_state.filter == null ->
+    {A#test_state{filter = [Filter]}, M};
+next_state({A, M}, _V, {call, ?MODULE, subscribe, [_Beacon, Filter]}) ->
+    {A#test_state{filter = A#test_state.filter ++ [Filter]}, M};
+next_state({A, M}, _V, {call, ?MODULE, unsubscribe, _Beacon}) ->
+    {A#test_state{filter = null}, M};
+next_state({A, M}, _V, {call, ?MODULE, close, _Beacon}) ->
+    {A#test_state{rbeacon = null}, M};
+next_state({A, M}, V, {call, ?MODULE, mock_new, Port}) ->
+    {A, M#test_state{rbeacon = V, port = Port}};
+next_state({A, M}, _V, {call, ?MODULE, mock_publish, [_Beacon, Binary]}) ->
+    {A, M#test_state{message = Binary}}.
 
 
 %% @doc Precondition, checked before command is added to the command sequence.
-precondition(S, {call, rbeacon, new, _Port}) ->
-    A = array:get(0,S),
+precondition({A, _M}, {call, rbeacon, new, _Port}) ->
     A#test_state.rbeacon == null;
-precondition(S, {call, ?MODULE, close, _Beacon}) ->
-    A = array:get(0,S),
+precondition({A, _M}, {call, ?MODULE, close, _Beacon}) ->
     A#test_state.rbeacon =/= null;
-precondition(S, {call, ?MODULE, publish, [_Beacon, _Binary]}) ->
-    A = array:get(0,S),
+precondition({A, _M}, {call, ?MODULE, publish, [_Beacon, _Binary]}) ->
     A#test_state.rbeacon =/= null;
-precondition(S, {call, ?MODULE, subscribe, [_Beacon, _Filter]}) ->
-    A = array:get(0,S),
+precondition({A, _M}, {call, ?MODULE, subscribe, [_Beacon, _Filter]}) ->
     A#test_state.rbeacon =/= null;
-precondition(S, {call, ?MODULE, unsubscribe, _Beacon}) ->
-    A = array:get(0,S),
+precondition({A, _M}, {call, ?MODULE, unsubscribe, _Beacon}) ->
     A#test_state.rbeacon =/= null
     andalso A#test_state.filter =/= null;
-precondition(S, {call, ?MODULE, mock_new, _Port}) ->
-    A = array:get(0,S),
+precondition({A, _M}, {call, ?MODULE, mock_new, _Port}) ->
     A#test_state.rbeacon =/= null;
+precondition({_A, M}, {call, ?MODULE, mock_publish, [_Beacon, _Binary]}) ->
+    M#test_state.rbeacon =/= null;
 precondition(_S, _Call) ->
     false.
 
@@ -104,6 +96,8 @@ postcondition(_S, {call, ?MODULE, unsubscribe, _Beacon}, ok) ->
     true;
 postcondition(_S, {call, ?MODULE, mock_new, _Port}, {ok, Beacon}) ->
     is_pid(Beacon);
+postcondition(_S, {call, ?MODULE, mock_publish, [_Beacon, _Binary]}, ok) ->
+    true;
 postcondition(_S, _Call, _Res) ->
     true.
 
@@ -123,3 +117,6 @@ unsubscribe({ok, Beacon}) ->
 %% Mock
 mock_new(Port) ->
     rbeacon:new(Port).
+
+mock_publish({ok, Beacon}, Binary) ->
+    rbeacon:publish(Beacon, Binary).
