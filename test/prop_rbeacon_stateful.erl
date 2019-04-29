@@ -120,7 +120,7 @@ postcondition({A, M}, {call, ?MODULE, recv, _Beacon}, _) ->
     orelse M#test_state.port =/= A#test_state.port
     orelse A#test_state.filter == null
     orelse M#test_state.interval == null
-    orelse not lists:member(M#test_state.message, A#test_state.filter);
+    orelse not lists:member(true, lists:map(fun (X) -> string:rstr(M#test_state.message, X) end, A#test_state.filter));
 postcondition(_S, {call, ?MODULE, mock_new, _Port}, {ok, Beacon}) ->
     is_pid(Beacon);
 postcondition(_S, {call, ?MODULE, mock_publish, [_Beacon, _Binary]}, ok) ->
