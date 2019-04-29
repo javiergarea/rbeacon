@@ -45,6 +45,10 @@ command(S) ->
 ascii_string() ->
      ?SUCHTHAT(S, string(), S == [X || X <- S, X =< 255]).
 
+%Binary filtering
+bin_filt(X) when is_binary(X) -> binary_to_list(X);
+bin_filt(X) -> X.
+
 % UDP ports 49152 through 65535
 user_udp_port() ->
     integer(49152, 65535).
@@ -120,7 +124,7 @@ postcondition({A, M}, {call, ?MODULE, recv, _Beacon}, _) ->
     orelse M#test_state.port =/= A#test_state.port
     orelse A#test_state.filter == null
     orelse M#test_state.interval == null
-    orelse not lists:member(true, lists:map(fun (X) -> string:rstr(M#test_state.message, X) end, A#test_state.filter));
+    orelse not lists:member(true, lists:map(fun (X) -> case string:rstr(bin_filt(M#test_state.message), X) of 0 -> false; _Else -> true end end, lists:map(fun(Y) -> bin_filt(Y) end,A#test_state.filter)));
 postcondition(_S, {call, ?MODULE, mock_new, _Port}, {ok, Beacon}) ->
     is_pid(Beacon);
 postcondition(_S, {call, ?MODULE, mock_publish, [_Beacon, _Binary]}, ok) ->
